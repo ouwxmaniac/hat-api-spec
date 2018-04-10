@@ -1,0 +1,10 @@
+{
+  "generator-openapi-repo": {
+    "importExistingSpec": false,
+    "name": "WDT Hail",
+    "repo": "ellym/hat-api-spec",
+    "splitSpec": false,
+    "samples": true,
+    "installSwaggerUI": true
+  }
+}
