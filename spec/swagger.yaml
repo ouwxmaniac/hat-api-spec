@@ -14,7 +14,14 @@ paths:
     get:
       summary: /hail_events/{date}
       description: |
-        Returns hail events for a specific date that intersect with the supplied geometry.
+        Returns hail events for a specific date that intersect with the
+        supplied geometry.
+
+        If the request includes a date that is no longer available or a
+        malformed geometry the 422 response code will be returned with an error
+        message describing what went wrong. If the date is now out of range the
+        error key `date_out_of_range` will be included in the payload. The user can
+        retry the request on the `/hail_history_reports` API.
       parameters:
         - name: date
           in: path
@@ -52,25 +59,24 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/HailEvent'
-        '422':
-          description: |
-            This will be sent if the user requested a date that is no longer
-            available via this API, if the geometry was malformed, or any other
-            error with the request payload.
+        '401':
+          description: Access token is missing or invalid
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/UserError'
+        '422':
+          description: User Request Data Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserError'
         '500':
           description: Unexpected Error
           content:
             application/json:
               schema:
-                typpe: array
-                items:
-                  $ref: '#components/schemas/Error'
+                $ref: '#/components/schemas/SystemError'
 
   /hail_history_reports:
     post:
@@ -141,32 +147,123 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HailHistoryReportStatus'
+        '401':
+          description: Access token is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserError'
+        '422':
+          description: User Request Data Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserError'
+        '500':
+          description: Unexpected Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemError'
 
+  /hail_history_reports/{id}:
+    get:
+      summary: /hail_history_reports/{id}
+      description: |
+        Query the status or return the data for the given report. Reports will be
+        periodically perged so do not rely on this being available longterm. It
+        is meant for getting feedback on the report generation process and
+        fetching the data once complete.
+
+      parameters:
+        - name: id
+          in: path
+          type: integer
+          description: ID of the hail history report
+
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    $ref: '#/components/schemas/HailHistoryReportStatus'
+                  report:
+                    $ref: '#/components/schemas/HailHistoryReport'
+        '401':
+          description: Access token is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserError'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserError'
+        '500':
+          description: Unexpected Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemError'
 
 components:
   securitySchemes:
     bearerAuth:
-      type: https
+      type: http
       scheme: bearer
+      description: |
+        Include your API Key in the HTTP Authorization header as a `Bearer`
+        token.
+
   schemas:
+    SystemError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: 'Uhoh! Something went wrong!'
+    UserError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: 'Something was wrong with your request.'
+          description: |
+            Describe the error that occurred
+        key:
+          type: string
+          enum: ['unknown', 'date_out_of_range']
+          description: |
+            For known errors that have a well-defined meaning we will include a
+            error code so the user can programatically handle the error.
+
     HailEvent:
       type: object
       properties:
         window_start_at:
           type: string
           format: date-time
+          example: '2018-04-06T00:00:00Z'
           description: |
             When was the earliest this event could have taken place, or said
             another way, when was the beginning of this observation window?
         window_end_at:
           type: string
           format: date-time
+          example: '2018-04-07T23:59:59Z'
           description: |
             When was the latest this event could have taken place, or said
             another way, when was the end of this observation window?
         max_hail_size:
           type: number
           format: double
+          example: 1.25
           description: |
             The maximum hail size that occurred in this geometry.
         shape_data:
@@ -184,6 +281,7 @@ components:
           type: string
           format: byte
           nullable: true
+          example: 'UE9JTlQoNzMuMDE4NTA5NzQ2NTU5OCAzMy42ODEwMjY1MDM3NjY1KQ=='
           description: |
             This is the actual data in the key. This may be `null` if a `uri`
             is provided to download the payload outside of this request. Either
@@ -191,18 +289,11 @@ components:
         uri:
           type: string
           nullable: true
+          example: 'https://example.com/path-to-endpoint-with-file'
           description: |
             A URI to download the data in a separate request. Either this or
             `payload` must be present.
 
-
-    Error:
-      type: object
-      properties:
-        message:
-          type: string
-          description: |
-            Describe the error that occurred
 
     GeometryParam:
       description: |
@@ -223,18 +314,29 @@ components:
       properties:
         id:
           type: integer
+          example: 123
           description: |
             Unique identifier for the history report
         status:
           type: string
           enum: ['pending', 'running', 'completed', 'errored']
+          description: |
+            The status of the generation of the report.
         progress:
           type: number
           format: double
           minimum: 0
           maximum: 1
+          nullable: true
+          description: |
+            A percentage completion of the report. If progress is unavailable
+            `null` can be returned.
         message:
           type: string
+          example: 'Waiting to start'
+          description: |
+            A short message intended to give feedback to the user on the
+            progress.
 
     HailHistoryReport:
       type: object
@@ -245,5 +347,3 @@ components:
             Unique identifier for this history report
         events:
           type: array
-          items:
-            $ref: '#/components/schemas/HailEvent'
