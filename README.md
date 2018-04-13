@@ -1,18 +1,14 @@
 # WDT Hail OpenAPI Specification
 [![Build Status](https://travis-ci.org/ellym/hat-api-spec.svg?branch=master)](https://travis-ci.org/ellym/hat-api-spec)
 
-## Steps to finish
+## Contributing
 
-1. Enable [Travis](https://docs.travis-ci.com/user/getting-started/#To-get-started-with-Travis-CI%3A) for your repository (**note**: you already have `.travis.yml` file)
-2. [Create GitHub access token](https://help.github.com/articles/creating-an-access-token-for-command-line-use/); check `public_repo` on `Select scopes` section.
-3. Use the token value as a value for [Travis environment variable](https://docs.travis-ci.com/user/environment-variables/#Defining-Variables-in-Repository-Settings) with the name `GH_TOKEN`
-4. Make a test commit to trigger CI: `git commit --allow-empty -m "Test Travis CI" && git push`
-5. Wait until Travis build is finished. You can check progress by clicking on the `Build Status` badge at the top
-6. If you did everything correct, https://ellym.github.io/hat-api-spec/ will lead to your new docs
-7. **[Optional]** You can setup [custom domain](https://help.github.com/articles/using-a-custom-domain-with-github-pages/) (just create `web/CNAME` file)
-8. Start writing/editing your OpenAPI spec: check out [usage](#usage) section below
-9. **[Optional]** If you document public API consider adding it into [APIs.guru](https://APIs.guru) directory using [this form](https://apis.guru/add-api/).
-10. Delete this section :smile:
+This is a spec for the API to be built by WDT for HAT. You can view the
+live documentation at http://www.ellym.co/hat-api-spec/
+
+If you have thoughts, ideas, concerns, or other feedback please create
+an issue or pull request. You can also watch this repo to ensure that
+you stay in the loop.
 
 ## Links
 
