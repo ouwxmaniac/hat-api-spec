@@ -1,0 +1,397 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "version": "0.0.1",
+    "title": "WDT Hail API",
+    "description": "This is a draft spec for the WDT hail event API that will be developed in\nconjunction with HAT. Please leave feedback and let's iterate on this to\nget this to a place that everyone is happy with.\n\nI would love feedback on this whole document so we can make it better. I\nhave flagged **TODO: Please Review** on the areas of the document that I am\nparticularly fuzzy on.\n"
+  },
+  "servers": [
+    {
+      "url": "http://wdt.example.com/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/hail_events/{date}": {
+      "get": {
+        "summary": "/hail_events/{date}",
+        "description": "Returns hail events for a specific date that intersect with the\nsupplied geometry.\n\nIf the request includes a date that is no longer available or a\nmalformed geometry the `422` response code will be returned with an error\nmessage describing what went wrong. If the date is now out of range the\nerror key `date_out_of_range` will be included in the payload. The user can\nretry the request on the `/hail_history_reports` API.\n",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "date",
+            "example": "2018-04-06",
+            "description": "A date on which to search for hail data at the specified geo\nlocation. The date is interpreted as a UTC date field.\n\n### TODO: Please Review\n\nHow ought this date field be interpreted in terms of time zone\nboundries etc.\n"
+          },
+          {
+            "name": "geometry",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "format": "wkt",
+            "example": "POINT(73.0185097465598 33.6810265037665)",
+            "description": "A PostGIS compatible EWKT string representing the geometry of the\narea for which we are querying. An intersection will be run with\nthis geometry and the hail events for the given date.\n\n### TODO: Please Review\n\nI have specified this as WKT because that would be easy to get into\na PostGIS query. It might make more sense to use geoJSON and switch\nthis to a POST endpoint so we can include it in the body. Let's\ndiscuss.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HailEvent"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "User Request Data Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hail_history_reports": {
+      "post": {
+        "summary": "/hail_history_reports",
+        "description": "This endpoint is designed to be asynchronous. For operations that are\nout of scope for the `/hail_events/{date}` (i.e. they return a `422`)\nthis endpoint can serve them because it does not have to finish the\ncalculations within the context of a single request.\n\n## Callback\n\nI defined the callback in the OpenAPI spec but it is not showing up in\nthis documentation site. So I'll mention it briefly here. It will be a\n`POST` to the specified URL. The payload will be the same as teh\n`report` field in the `GET /hail_history_reports/{id}` endpoint. For\nmore details you can look at the spec file.\n",
+        "parameters": [
+          {
+            "name": "window_start_at",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "format": "date-time",
+            "example": "2017-07-12T00:00:00Z",
+            "description": "The beginning of the window for which the user wants to report.\nOnly events after this date-time will be returned.\n"
+          },
+          {
+            "name": "window_end_at",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "format": "date-time",
+            "example": "2018-03-31T23:59:59Z",
+            "description": "The end of the window for which the user wants to report. Only\nevents before this date-time will be returned.\n"
+          },
+          {
+            "name": "geometry",
+            "in": "query",
+            "required": true,
+            "type": "string",
+            "format": "wkt",
+            "example": "POINT(73.0185097465598 33.6810265037665)",
+            "description": "A PostGIS compatible EWKT string representing the geometry of the\narea for which we are querying. An intersection will be run with\nthis geometry and the hail events for the given date.\n\n### TODO: Please Review\n\nI have specified this as WKT because that would be easy to get into\na PostGIS query. It might make more sense to use geoJSON and switch\nthis to a POST endpoint so we can include it in the body. I'm\nreally fine either way.\n"
+          },
+          {
+            "name": "callback_url",
+            "in": "query",
+            "type": "string",
+            "example": "http://example.com/callbacks/hail_report_complete",
+            "description": "The URL that will be notified when the hail history report is\ncompleted.\n"
+          }
+        ],
+        "callbacks": {
+          "completed": {
+            "{$request.parameters#/callback_url}": {
+              "post": {
+                "requestBody": {
+                  "required": true,
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/HailHistoryReport"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HailHistoryReportStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "User Request Data Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/hail_history_reports/{id}": {
+      "get": {
+        "summary": "/hail_history_reports/{id}",
+        "description": "Query the status or return the data for the given report. Reports will be\nperiodically perged so do not rely on this being available longterm. It\nis meant for getting feedback on the report generation process and\nfetching the data once complete.\n\n### TODO: Please Review\n\nPlease review the success response below. Under the `report.events` you\nwill see the proposed schema of the hail event itself. I don't know\nwhat data is available in your system to fill in here, but if there are\nany other interesting pieces of information that we could include here\nwe should add them.\n",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "type": "integer",
+            "description": "ID of the hail history report"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "$ref": "#/components/schemas/HailHistoryReportStatus"
+                    },
+                    "report": {
+                      "$ref": "#/components/schemas/HailHistoryReport"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access token is missing or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Include your API Key in the HTTP Authorization header as a `Bearer`\ntoken.\n"
+      }
+    },
+    "schemas": {
+      "SystemError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Uhoh! Something went wrong!"
+          }
+        }
+      },
+      "UserError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Something was wrong with your request.",
+            "description": "Describe the error that occurred\n"
+          },
+          "key": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "date_out_of_range"
+            ],
+            "description": "For known errors that have a well-defined meaning we will include a\nerror code so the user can programatically handle the error.\n"
+          }
+        }
+      },
+      "HailHistoryReportStatus": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 123,
+            "description": "Unique identifier for the history report\n"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "errored"
+            ],
+            "description": "The status of the generation of the report.\n"
+          },
+          "progress": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "maximum": 1,
+            "nullable": true,
+            "description": "A percentage completion of the report. If progress is unavailable\n`null` can be returned.\n"
+          },
+          "message": {
+            "type": "string",
+            "example": "Waiting to start",
+            "description": "A short message intended to give feedback to the user on the\nprogress.\n"
+          }
+        }
+      },
+      "HailHistoryReport": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique identifier for this history report\n"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HailEvent"
+            },
+            "description": "List of hail events that occurred in this report\n\n### TODO: Please Review:\n\nPlease let me know if there are additional fields that should be\nincluded here. Even if HAT does not use them today they might be\nuseful in the future.\n"
+          }
+        }
+      },
+      "HailEvent": {
+        "type": "object",
+        "properties": {
+          "window_start_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2018-04-06T00:00:00Z",
+            "description": "When was the earliest this event could have taken place, or said\nanother way, when was the beginning of this observation window?\n"
+          },
+          "window_end_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2018-04-07T23:59:59Z",
+            "description": "When was the latest this event could have taken place, or said\nanother way, when was the end of this observation window?\n"
+          },
+          "max_hail_size": {
+            "type": "number",
+            "format": "double",
+            "example": 1.25,
+            "description": "The maximum hail size that occurred in this geometry.\n"
+          },
+          "shape_data": {
+            "$ref": "#/components/schemas/ShapeData"
+          }
+        }
+      },
+      "ShapeData": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "wkt",
+              "geojosn",
+              "shape"
+            ],
+            "description": "This describes what the format of the data that is being referenced is.\n"
+          },
+          "payload": {
+            "type": "string",
+            "format": "byte",
+            "nullable": true,
+            "example": "UE9JTlQoNzMuMDE4NTA5NzQ2NTU5OCAzMy42ODEwMjY1MDM3NjY1KQ==",
+            "description": "This is the actual data in the key. This may be `null` if a `uri`\nis provided to download the payload outside of this request. Either\nthis or `uri` must be present.\n"
+          },
+          "uri": {
+            "type": "string",
+            "nullable": true,
+            "example": "https://example.com/path-to-endpoint-with-file",
+            "description": "A URI to download the data in a separate request. Either this or\n`payload` must be present.\n"
+          }
+        }
+      }
+    }
+  }
+}
