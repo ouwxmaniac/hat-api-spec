@@ -4,7 +4,12 @@ info:
   title: WDT Hail API
   description: |
     This is a draft spec for the WDT hail event API that will be developed in
-    conjunction with HAT.
+    conjunction with HAT. Please leave feedback and let's iterate on this to
+    get this to a place that everyone is happy with.
+
+    I would love feedback on this whole document so we can make it better. I
+    have flagged **TODO: Please Review** on the areas of the document that I am
+    particularly fuzzy on.
 servers:
   - url: http://wdt.example.com/v1
 security:
@@ -18,7 +23,7 @@ paths:
         supplied geometry.
 
         If the request includes a date that is no longer available or a
-        malformed geometry the 422 response code will be returned with an error
+        malformed geometry the `422` response code will be returned with an error
         message describing what went wrong. If the date is now out of range the
         error key `date_out_of_range` will be included in the payload. The user can
         retry the request on the `/hail_history_reports` API.
@@ -33,8 +38,10 @@ paths:
             A date on which to search for hail data at the specified geo
             location. The date is interpreted as a UTC date field.
 
-            **Please review**: How ought this date field be interpreted in
-            terms of time zone boundries etc.
+            ### TODO: Please Review
+
+            How ought this date field be interpreted in terms of time zone
+            boundries etc.
         - name: geometry
           in: query
           required: true
@@ -46,10 +53,12 @@ paths:
             area for which we are querying. An intersection will be run with
             this geometry and the hail events for the given date.
 
-            **Please Review**: I have specified this as WKT because that would be easy
-            to get into a PostGIS query. It might make more sense to use
-            geoJSON and switch this to a POST endpoint so we can include it in
-            the body. Let's discuss.
+            ### TODO: Please Review
+
+            I have specified this as WKT because that would be easy to get into
+            a PostGIS query. It might make more sense to use geoJSON and switch
+            this to a POST endpoint so we can include it in the body. Let's
+            discuss.
       responses:
         '200':
           description: OK
@@ -87,6 +96,14 @@ paths:
         this endpoint can serve them because it does not have to finish the
         calculations within the context of a single request.
 
+        ## Callback
+
+        I defined the callback in the OpenAPI spec but it is not showing up in
+        this documentation site. So I'll mention it briefly here. It will be a
+        `POST` to the specified URL. The payload will be the same as teh
+        `report` field in the `GET /hail_history_reports/{id}` endpoint. For
+        more details you can look at the spec file.
+
       parameters:
         - name: window_start_at
           in: query
@@ -117,10 +134,12 @@ paths:
             area for which we are querying. An intersection will be run with
             this geometry and the hail events for the given date.
 
-            **Please Review**: I have specified this as WKT because that would be easy
-            to get into a PostGIS query. It might make more sense to use
-            geoJSON and switch this to a POST endpoint so we can include it in
-            the body. I'm really fine either way.
+            ### TODO: Please Review
+
+            I have specified this as WKT because that would be easy to get into
+            a PostGIS query. It might make more sense to use geoJSON and switch
+            this to a POST endpoint so we can include it in the body. I'm
+            really fine either way.
         - name: callback_url
           in: query
           type: string
@@ -131,7 +150,7 @@ paths:
 
       callbacks:
         completed:
-          '{$request.parameters#/callback_url':
+          '{$request.parameters#/callback_url}':
             post:
               requestBody:
                 required: true
@@ -228,6 +247,7 @@ components:
         message:
           type: string
           example: 'Uhoh! Something went wrong!'
+
     UserError:
       type: object
       properties:
@@ -242,6 +262,49 @@ components:
           description: |
             For known errors that have a well-defined meaning we will include a
             error code so the user can programatically handle the error.
+
+    HailHistoryReportStatus:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 123
+          description: |
+            Unique identifier for the history report
+        status:
+          type: string
+          enum: ['pending', 'running', 'completed', 'errored']
+          description: |
+            The status of the generation of the report.
+        progress:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          nullable: true
+          description: |
+            A percentage completion of the report. If progress is unavailable
+            `null` can be returned.
+        message:
+          type: string
+          example: 'Waiting to start'
+          description: |
+            A short message intended to give feedback to the user on the
+            progress.
+
+    HailHistoryReport:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: |
+            Unique identifier for this history report
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/HailEvent'
+          descroption: |
+            List of hail events that occurred in this report
 
     HailEvent:
       type: object
@@ -294,56 +357,3 @@ components:
             A URI to download the data in a separate request. Either this or
             `payload` must be present.
 
-
-    GeometryParam:
-      description: |
-        A PostGIS compatible EWKT string representing the geometry of the
-        area for which we are querying. An intersection will be run with
-        this geometry and the hail events for the given date.
-
-        **Please Review**: I have specified this as WKT because that would be easy
-        to get into a PostGIS query. It might make more sense to use
-        geoJSON and switch this to a POST endpoint so we can include it in
-        the body. I'm really fine either way.
-      schema:
-        type: string
-        format: wkt
-
-    HailHistoryReportStatus:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 123
-          description: |
-            Unique identifier for the history report
-        status:
-          type: string
-          enum: ['pending', 'running', 'completed', 'errored']
-          description: |
-            The status of the generation of the report.
-        progress:
-          type: number
-          format: double
-          minimum: 0
-          maximum: 1
-          nullable: true
-          description: |
-            A percentage completion of the report. If progress is unavailable
-            `null` can be returned.
-        message:
-          type: string
-          example: 'Waiting to start'
-          description: |
-            A short message intended to give feedback to the user on the
-            progress.
-
-    HailHistoryReport:
-      type: object
-      properties:
-        id:
-          type: integer
-          description: |
-            Unique identifier for this history report
-        events:
-          type: array
