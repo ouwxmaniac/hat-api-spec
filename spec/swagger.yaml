@@ -194,6 +194,13 @@ paths:
         is meant for getting feedback on the report generation process and
         fetching the data once complete.
 
+        ### TODO: Please Review
+
+        Please review the success response below. Under the `report.events` you
+        will see the proposed schema of the hail event itself. I don't know
+        what data is available in your system to fill in here, but if there are
+        any other interesting pieces of information that we could include here
+        we should add them.
       parameters:
         - name: id
           in: path
@@ -303,8 +310,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/HailEvent'
-          descroption: |
+          description: |
             List of hail events that occurred in this report
+
+            ### TODO: Please Review:
+
+            Please let me know if there are additional fields that should be
+            included here. Even if HAT does not use them today they might be
+            useful in the future.
 
     HailEvent:
       type: object
